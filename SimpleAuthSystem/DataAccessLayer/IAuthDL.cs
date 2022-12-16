@@ -11,5 +11,7 @@ namespace SimpleAuthSystem.DataAccessLayer
         public Task<SignUpResponse> SignUp(SignUpRequest request);
 
         public Task<SignInResponse> SignIn(SignInRequest request);
+
+        public Task<BruteForceResponse> BruteForceGetHandler();
     }
 }

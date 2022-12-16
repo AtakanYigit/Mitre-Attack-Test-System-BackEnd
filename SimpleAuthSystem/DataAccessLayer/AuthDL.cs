@@ -1,108 +1,188 @@
 ﻿using Microsoft.Extensions.Configuration;
 using MySql.Data.MySqlClient;
+using MySqlX.XDevAPI.Common;
 using SimpleAuthSystem.Model;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Data.SqlClient;
 using System.Linq;
+using System.Reflection.PortableExecutable;
 using System.Threading.Tasks;
+using Ubiety.Dns.Core;
 
 namespace SimpleAuthSystem.DataAccessLayer{
+    public class data{
+        public string UserName { get; set; }
+        public string PassWord { get; set; }
+        public System.Byte IsCorrect { get; set; }
+    }
+
     public class AuthDL : IAuthDL{
         public readonly IConfiguration _configuration;
         public readonly MySqlConnection _mySqlConnection;
 
-        public AuthDL(IConfiguration configuration)
-        {
+        public AuthDL(IConfiguration configuration){
             _configuration = configuration;
-            _mySqlConnection = new MySqlConnection(_configuration["ConnectionStrings:Data Source = localhost;Initial Catalog = MidtermProject; Integrated Security=True"]);
         }
 
-        public async Task<SignInResponse> SignIn(SignInRequest request){
+        //--------------------------------------------------------------SignIn--------------------------------------------------------------
+        public Task<SignInResponse> SignIn(SignInRequest request){
             SignInResponse response = new SignInResponse();
             response.IsSuccess = true;
             response.Message = "Successful";
-            try{
-                if(_mySqlConnection.State != System.Data.ConnectionState.Open){
-                    await _mySqlConnection.OpenAsync();
-                }
 
-                //string SqlQuery = @"SELECT * 
-                //                    FROM crudoperation.userdetail 
-                //                    WHERE UserName=@UserName AND PassWord=@PassWord AND Role=@Role;";
+            try
+            {
+                using (SqlConnection con = new SqlConnection("Server=PURJAXX;Database=MidtermProject;Trusted_Connection=True;"))
+                {
+                    int recordsAffected = 0;
+                    SqlCommand command = new SqlCommand($"SELECT COUNT(*) FROM [user] as u WHERE u.UserName=@UserName AND u.PassWord=@PassWord", con);
 
-                string SqlQuery = @"SELECT * 
-                                    FROM users
-                                    WHERE UserName=@UserName AND PassWord=@PassWord AND Role=@Role;";
+                    try
+                    {
+                        con.Open();
+                        command.Parameters.AddWithValue("@UserName", request.UserName);
+                        command.Parameters.AddWithValue("@PassWord", request.Password);
+                        recordsAffected = (int)command.ExecuteScalar();
+                    }
+                    catch
+                    {
 
-                using (MySqlCommand sqlCommand = new MySqlCommand(SqlQuery, _mySqlConnection)){
-                    sqlCommand.CommandType = System.Data.CommandType.Text;
-                    sqlCommand.CommandTimeout = 180;
-                    sqlCommand.Parameters.AddWithValue("@UserName", request.UserName);
-                    sqlCommand.Parameters.AddWithValue("@PassWord", request.Password);
+                    }
+                    finally
+                    {
+                        con.Close();
+                    }
 
-                    using (DbDataReader dataReader = await sqlCommand.ExecuteReaderAsync()){
-                        if (dataReader.HasRows){
-                            response.Message = "Login Successfully";
-                        }
-                        else
+                    if (recordsAffected == 0)
+                    {                           //----------Successful Login
+                        response.Message = "Login Unsuccessfully";
+                        response.IsSuccess = false;
+
+                        //Adding Fail Log To The Database  -----FOR BRUTE FORCE TEST-----
+                        SqlCommand commandForLog = new SqlCommand($"INSERT INTO logs (UserName, PassWord, IsCorrect) VALUES (@UserName, @PassWord, @IsCorrect)", con);
+
+                        try
                         {
-                            response.IsSuccess = false;
-                            response.Message = "Login Unsuccessfully";
-                            return response;
+                            con.Open();
+                            commandForLog.Parameters.AddWithValue("@UserName", request.UserName);
+                            commandForLog.Parameters.AddWithValue("@PassWord", request.Password);
+                            commandForLog.Parameters.AddWithValue("@IsCorrect", false);
+                            commandForLog.ExecuteScalar();
+                        }
+                        catch
+                        {
+
+                        }
+                        finally
+                        {
+                            con.Close();
+                        }
+                    }
+                    else
+                    {                                              //----------Failed Login
+                        response.Message = "Login Successfully";
+
+                        //Adding Success Log To The Database  -----FOR BRUTE FORCE TEST-----
+                        SqlCommand commandForLog = new SqlCommand($"INSERT INTO logs (UserName, PassWord, IsCorrect) VALUES (@UserName, @PassWord, @IsCorrect)", con);
+
+                        try
+                        {
+                            con.Open();
+                            commandForLog.Parameters.AddWithValue("@UserName", request.UserName);
+                            commandForLog.Parameters.AddWithValue("@PassWord", request.Password);
+                            commandForLog.Parameters.AddWithValue("@IsCorrect", true);
+                            commandForLog.ExecuteScalar();
+                        }
+                        catch
+                        {
+
+                        }
+                        finally
+                        {
+                            con.Close();
                         }
                     }
                 }
-
             }
-            catch(Exception ex){
+            catch (Exception ex)
+            {
                 response.IsSuccess = false;
                 response.Message = ex.Message;
             }
-            finally{
-
+            finally
+            {
             }
 
-            return response;
+            return Task.FromResult(response);
         }
 
+
+        //-------------------------------------------------------------Sign Up-------------------------------------------------------------
         public async Task<SignUpResponse> SignUp(SignUpRequest request){
             SignUpResponse response = new SignUpResponse();
             response.IsSuccess = true;
-            response.Message = "Successful";
-            try{
-                if (_mySqlConnection.State != System.Data.ConnectionState.Open){
-                    await _mySqlConnection.OpenAsync();
-                }
+            response.Message = "All Good";
 
-                if (!request.Password.Equals(request.ConfigPassword)){
-                    response.IsSuccess = false;
-                    response.Message = "Password & Confirm Password not Match";
-                    return response;
-                }
-
-                string SqlQuery = @"INSERT INTO crudoperation.userdetail 
-                                    (UserName, PassWord) VALUES 
-                                    (@UserName, @PassWord)";
-
-                using MySqlCommand sqlCommand = new MySqlCommand(SqlQuery, _mySqlConnection);
-                sqlCommand.CommandType = System.Data.CommandType.Text;
-                sqlCommand.CommandTimeout = 180;
-                sqlCommand.Parameters.AddWithValue("@UserName", request.UserName);
-                sqlCommand.Parameters.AddWithValue("@PassWord", request.Password);
-                int Status = await sqlCommand.ExecuteNonQueryAsync();
-                if (Status <= 0){
-                    response.IsSuccess = false;
-                    response.Message = "Something Went Wrong";
-                    return response;
+            try
+            {
+                using (SqlConnection con = new SqlConnection("Server=PURJAXX;Database=MidtermProject;Trusted_Connection=True;"))
+                {
+                    SqlCommand command = new SqlCommand($"INSERT INTO [user] (UserName, PassWord) VALUES (@UserName, @PassWord)", con);
+                    con.Open();
+                    command.Parameters.AddWithValue("@UserName", request.UserName);
+                    command.Parameters.AddWithValue("@PassWord", request.Password);
+                    command.ExecuteScalar();
                 }
             }
-            catch (Exception ex){
+            catch (Exception ex)
+            {
                 response.IsSuccess = false;
                 response.Message = ex.Message;
             }
-            finally{
+            return response;
+        }
 
+
+
+        //---------------------------------------------------Brute Force Get Request Handler---------------------------------------------------
+        public async Task<BruteForceResponse> BruteForceGetHandler(){
+            BruteForceResponse response = new BruteForceResponse();
+            response.IsSuccess = true;
+            response.Message = "Successful";
+
+            try{
+                using (SqlConnection con = new SqlConnection("Server=PURJAXX;Database=MidtermProject;Trusted_Connection=True;")){
+                    SqlCommand command = new SqlCommand($"SELECT * FROM logs", con);
+
+                    try{
+                        con.Open();
+                        SqlDataReader reader = command.ExecuteReader();
+                        List<data> result = new List<data>();
+
+                        while (reader.Read()){
+                            var d = new data();
+                            d.UserName = (string)reader[0];
+                            d.PassWord = (string)reader[1];
+                            d.IsCorrect = (System.Byte)reader[2];
+                            result.Add(d);
+                        }
+
+                        reader.Close();
+                        response.Data = result;
+                    }catch{
+
+                    }finally{
+                        con.Close();
+                    }
+                }
+            }catch (Exception ex){
+                response.IsSuccess = false;
+                response.Message = ex.Message;
+            }
+            finally
+            {
             }
 
             return response;

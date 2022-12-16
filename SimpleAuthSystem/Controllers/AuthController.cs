@@ -7,28 +7,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace SimpleAuthSystem.Controllers
-{
+namespace SimpleAuthSystem.Controllers{
     [Route("api/[controller]/[Action]")]
     [ApiController]
-    public class AuthController : ControllerBase
-    {
+    public class AuthController : ControllerBase{
         public readonly IAuthDL _authDL;
-        public AuthController(IAuthDL authDL)
-        {
+        public AuthController(IAuthDL authDL){
             _authDL = authDL;
         }
 
         [HttpPost]
-        public async Task<ActionResult> SignUp(SignUpRequest request)
-        {
+        public async Task<ActionResult> SignUp(SignUpRequest request){
             SignUpResponse response = new SignUpResponse();
-            try
-            {
+            try{
                 response = await _authDL.SignUp(request);
             }
-            catch(Exception ex)
-            {
+            catch(Exception ex){
                 response.IsSuccess = false;
                 response.Message = ex.Message;
             }
@@ -37,15 +31,25 @@ namespace SimpleAuthSystem.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult> SignIn(SignInRequest request)
-        {
+        public async Task<ActionResult> SignIn(SignInRequest request){
             SignInResponse response = new SignInResponse();
-            try
-            {
+            try{
                 response = await _authDL.SignIn(request);
             }
-            catch (Exception ex)
-            {
+            catch (Exception ex){
+                response.IsSuccess = false;
+                response.Message = ex.Message;
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost]
+        public async Task<ActionResult> BruteForce(){
+            BruteForceResponse response = new BruteForceResponse();
+            try{
+                response = await _authDL.BruteForceGetHandler();
+            }catch (Exception ex){
                 response.IsSuccess = false;
                 response.Message = ex.Message;
             }
