@@ -25,4 +25,4 @@ Project also includes registration and login processes.
 - Atakan Yiğit Çengeloğlu
 - İrem Batak
 ---
-Front-end repository - https://github.com/AtakanYigit/WebApplicationDevelopmentMidtermProject-FrontEnd
+Front-end repository - github.com/AtakanYigit/Mitre-Attack-Test-System-FrontEnd
